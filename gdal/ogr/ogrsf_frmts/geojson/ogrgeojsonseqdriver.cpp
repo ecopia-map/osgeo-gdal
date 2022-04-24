@@ -209,24 +209,24 @@ OGRLayer* OGRGeoJSONSeqDataSource::ICreateLayer( const char* pszNameIn,
     }
     else
     {
-        OGRSpatialReference oSRSWGS84;
-        oSRSWGS84.SetWellKnownGeogCS( "WGS84" );
-        oSRSWGS84.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
-        const char* const apszOptions[] = {
-            "IGNORE_DATA_AXIS_TO_SRS_AXIS_MAPPING=YES", nullptr };
-        if( !poSRS->IsSame(&oSRSWGS84, apszOptions) )
-        {
-            poCT = OGRCreateCoordinateTransformation( poSRS, &oSRSWGS84 );
-            if( poCT == nullptr )
-            {
-                CPLError(
-                    CE_Warning, CPLE_AppDefined,
-                    "Failed to create coordinate transformation between the "
-                    "input coordinate system and WGS84." );
+        // OGRSpatialReference oSRSWGS84;
+        // oSRSWGS84.SetWellKnownGeogCS( "WGS84" );
+        // oSRSWGS84.SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
+        // const char* const apszOptions[] = {
+        //     "IGNORE_DATA_AXIS_TO_SRS_AXIS_MAPPING=YES", nullptr };
+        // if( !poSRS->IsSame(&oSRSWGS84, apszOptions) )
+        // {
+        //     poCT = OGRCreateCoordinateTransformation( poSRS, &oSRSWGS84 );
+        //     if( poCT == nullptr )
+        //     {
+        //         CPLError(
+        //             CE_Warning, CPLE_AppDefined,
+        //             "Failed to create coordinate transformation between the "
+        //             "input coordinate system and WGS84." );
 
-                return nullptr;
-            }
-        }
+        //         return nullptr;
+        //     }
+        // }
     }
 
     m_poLayer.reset(
