@@ -120,6 +120,8 @@ void VRTRasterBand::Initialize( int nXSize, int nYSize )
     m_psSavedHistograms = nullptr;
 
     m_poMaskBand = nullptr;
+
+    m_isSkipExternalOvrFile = false;
 }
 
 /************************************************************************/
@@ -136,6 +138,15 @@ VRTRasterBand::~VRTRasterBand()
         CPLDestroyXMLNode( m_psSavedHistograms );
 
     delete m_poMaskBand;
+}
+
+
+/************************************************************************/
+/*                            SetIsSkipExternalOvrFile()                */
+/************************************************************************/
+
+void VRTRasterBand::SetIsSkipExternalOvrFile(bool isSkipExternalOvrFile) {
+    m_isSkipExternalOvrFile = isSkipExternalOvrFile;
 }
 
 /************************************************************************/
@@ -1165,9 +1176,11 @@ int VRTRasterBand::GetOverviewCount()
         return static_cast<int>(m_aoOverviewInfos.size());
 
     // If not found, external .ovr overviews
-    const int nOverviewCount = GDALRasterBand::GetOverviewCount();
-    if( nOverviewCount )
-        return nOverviewCount;
+    if (!m_isSkipExternalOvrFile) {
+        const int nOverviewCount = GDALRasterBand::GetOverviewCount();
+        if( nOverviewCount )
+            return nOverviewCount;
+    }
 
     if( poVRTDS->m_apoOverviews.empty() )
     {
@@ -1242,9 +1255,11 @@ GDALRasterBand *VRTRasterBand::GetOverview( int iOverview )
     }
 
     // If not found, external .ovr overviews
-    GDALRasterBand* poRet = GDALRasterBand::GetOverview( iOverview );
-    if( poRet )
-        return poRet;
+    if (!m_isSkipExternalOvrFile) {
+        GDALRasterBand* poRet = GDALRasterBand::GetOverview( iOverview );
+        if( poRet )
+            return poRet;
+    }
 
     // If not found, implicit virtual overviews
     VRTDataset* poVRTDS = static_cast<VRTDataset *>( poDS );
