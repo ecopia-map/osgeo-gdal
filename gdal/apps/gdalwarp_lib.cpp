@@ -2421,7 +2421,17 @@ GDALDatasetH GDALWarpDirect( const char *pszDest, GDALDatasetH hDstDS,
 /* -------------------------------------------------------------------- */
         GDALDataset* poSrcDS = static_cast<GDALDataset*>(hSrcDS);
         GDALDataset* poSrcOvrDS = nullptr;
-        int nOvCount = poSrcDS->GetRasterBand(1)->GetOverviewCount();
+        bool isSkipExternalOvrFile = false;
+        int nOvCount = 0;
+
+ovrRetryLabel:
+        GDALRasterBand *rasterBand = poSrcDS->GetRasterBand(1);
+        if (typeid(*rasterBand) == typeid(VRTSourcedRasterBand)) {
+            VRTRasterBand* vrtRasterBand = static_cast<VRTRasterBand*>(rasterBand);
+            vrtRasterBand->SetIsSkipExternalOvrFile(isSkipExternalOvrFile);
+        }
+
+        nOvCount = rasterBand->GetOverviewCount();
         if( psOptions->nOvLevel <= -2 && nOvCount > 0 )
         {
             double dfTargetRatio = 0;
@@ -2509,6 +2519,11 @@ GDALDatasetH GDALWarpDirect( const char *pszDest, GDALDatasetH hDstDS,
                     CPLDebug("WARP", "Selecting overview level %d for %s",
                                 iOvr, GDALGetDescription(hSrcDS));
                     poSrcOvrDS = GDALCreateOverviewDataset( poSrcDS, iOvr, FALSE );
+                }else {
+                    if (!isSkipExternalOvrFile) {
+                        isSkipExternalOvrFile = true;
+                        goto ovrRetryLabel;
+                    }
                 }
             }
         }

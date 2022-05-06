@@ -443,6 +443,8 @@ class CPL_DLL VRTRasterBand CPL_NON_FINAL: public GDALRasterBand
   protected:
     friend class VRTDataset;
 
+    bool           m_isSkipExternalOvrFile = false;
+
     int            m_bIsMaskBand;
 
     int            m_bNoDataValueSet;
@@ -547,6 +549,8 @@ class CPL_DLL VRTRasterBand CPL_NON_FINAL: public GDALRasterBand
 
     virtual int         IsSourcedRasterBand() { return FALSE; }
     virtual int         IsPansharpenRasterBand() { return FALSE; }
+
+    void SetIsSkipExternalOvrFile(bool);
 };
 
 /************************************************************************/
