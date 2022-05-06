@@ -2521,8 +2521,10 @@ ovrRetryLabel:
                     poSrcOvrDS = GDALCreateOverviewDataset( poSrcDS, iOvr, FALSE );
                 }else {
                     if (!isSkipExternalOvrFile) {
-                        isSkipExternalOvrFile = true;
-                        goto ovrRetryLabel;
+                        if (typeid(*rasterBand) == typeid(VRTSourcedRasterBand)) {
+                            isSkipExternalOvrFile = true;
+                            goto ovrRetryLabel;
+                        }
                     }
                 }
             }
