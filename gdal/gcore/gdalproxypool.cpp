@@ -33,6 +33,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 
 #include "cpl_conv.h"
 #include "cpl_error.h"
@@ -60,6 +61,7 @@ CPL_CVSID("$Id$")
 
 class GDALDatasetPool;
 static GDALDatasetPool* singleton = nullptr;
+static std::map<std::string, int> datasetPreOpenMap;
 
 void GDALNullifyProxyPoolSingleton() { singleton = nullptr; }
 
@@ -499,6 +501,20 @@ GDALProxyPoolCacheEntry* GDALDatasetPool::RefDataset(const char* pszFileName,
                                                      bool bForceOpen,
                                                      const char* pszOwner)
 {
+    bool isFirstOpen = false;
+    std::string pszFileNameStr(pszFileName);
+    if (datasetPreOpenMap.find(pszFileNameStr) == datasetPreOpenMap.end()) {
+        CPLMutexHolderD( GDALGetphDLMutex() );
+        datasetPreOpenMap[pszFileNameStr] = 0;
+        isFirstOpen = true;
+    }
+    if (isFirstOpen) {
+        int nFlag = ((eAccess == GA_Update) ? GDAL_OF_UPDATE : GDAL_OF_READONLY) | GDAL_OF_RASTER | GDAL_OF_VERBOSE_ERROR;
+        GDALDataset* dataset = GDALDataset::Open( pszFileName, nFlag, nullptr,
+                                                papszOpenOptions, nullptr );
+        GDALClose(dataset);
+    }
+
     CPLMutexHolderD( GDALGetphDLMutex() );
     return singleton->_RefDataset(pszFileName, eAccess, papszOpenOptions,
                                   bShared, bForceOpen, pszOwner);
