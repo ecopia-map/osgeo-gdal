@@ -56,6 +56,49 @@ CPL_CVSID("$Id$")
 
 /*! @cond Doxygen_Suppress */
 
+typedef struct
+{
+    VRTSource    *vrtSource;
+    GDALDataType eDataType;
+    int nXOff;
+    int nYOff;
+    int nXSize;
+    int nYSize;
+    void *pData;
+    int nBufXSize;
+    int nBufYSize;
+    GDALDataType eBufType;
+    GSpacing nPixelSpace;
+    GSpacing nLineSpace;
+    GDALRasterIOExtraArg* psExtraArg;
+    CPLJoinableThread* hThread;
+    CPLErr eErr;
+
+} RasterIOThreadData;
+
+static void RasterIOThreadMain(void *pThreadData) {
+    volatile RasterIOThreadData* psData =
+        static_cast<volatile RasterIOThreadData*>(pThreadData);
+
+    psData->eErr = psData->vrtSource->RasterIO(
+        psData->eDataType,
+        psData->nXOff,
+        psData->nYOff,
+        psData->nXSize,
+        psData->nYSize,
+        psData->pData,
+        psData->nBufXSize,
+        psData->nBufYSize,
+        psData->eBufType,
+        psData->nPixelSpace,
+        psData->nLineSpace,
+        psData->psExtraArg);
+
+    if (psData->eErr != CE_None) {
+        CPLDebug("VRTSourcedRasterBand", "RasterIOThreadMain fail");
+    }
+}
+
 /************************************************************************/
 /* ==================================================================== */
 /*                          VRTSourcedRasterBand                        */
@@ -327,26 +370,45 @@ CPLErr VRTSourcedRasterBand::IRasterIO( GDALRWFlag eRWFlag,
 /*      Overlay each source in turn over top this.                      */
 /* -------------------------------------------------------------------- */
     CPLErr eErr = CE_None;
+
+    RasterIOThreadData* rioThreadContext = new RasterIOThreadData[nSources];
+    for( int iSource = 0; iSource < nSources; iSource++ )
+    {
+
+        rioThreadContext[iSource].vrtSource = papoSources[iSource];
+        rioThreadContext[iSource].eDataType = eDataType;
+        rioThreadContext[iSource].nXOff = nXOff;
+        rioThreadContext[iSource].nYOff = nYOff;
+        rioThreadContext[iSource].nXSize = nXSize;
+        rioThreadContext[iSource].nYSize = nYSize;
+        rioThreadContext[iSource].pData = pData;
+        rioThreadContext[iSource].nBufXSize = nBufXSize;
+        rioThreadContext[iSource].nBufYSize = nBufYSize;
+        rioThreadContext[iSource].eBufType = eBufType;
+        rioThreadContext[iSource].nPixelSpace = nPixelSpace;
+        rioThreadContext[iSource].nLineSpace = nLineSpace;
+        rioThreadContext[iSource].psExtraArg = psExtraArg;
+        rioThreadContext[iSource].eErr = CE_None;
+
+        rioThreadContext[iSource].hThread = CPLCreateJoinableThread(
+            RasterIOThreadMain,
+            const_cast<RasterIOThreadData *>(&rioThreadContext[iSource]));
+        if (rioThreadContext[iSource].hThread == nullptr) {
+            CPLDebug("VRTSourcedRasterBand", "create thread RasterIOThreadMain fail");
+
+            eErr = CE_Failure;
+            break;
+        }
+    }
     for( int iSource = 0; eErr == CE_None && iSource < nSources; iSource++ )
     {
-        psExtraArg->pfnProgress = GDALScaledProgress;
-        psExtraArg->pProgressData =
-            GDALCreateScaledProgress( 1.0 * iSource / nSources,
-                                      1.0 * (iSource + 1) / nSources,
-                                      pfnProgressGlobal,
-                                      pProgressDataGlobal );
-        if( psExtraArg->pProgressData == nullptr )
-            psExtraArg->pfnProgress = nullptr;
+        CPLJoinThread(rioThreadContext[iSource].hThread);
+        if (rioThreadContext[iSource].eErr != CE_None) {
+            eErr = rioThreadContext[iSource].eErr;
+        }
 
-        eErr =
-            papoSources[iSource]->RasterIO( eDataType,
-                                            nXOff, nYOff, nXSize, nYSize,
-                                            pData, nBufXSize, nBufYSize,
-                                            eBufType, nPixelSpace, nLineSpace,
-                                            psExtraArg);
-
-        GDALDestroyScaledProgress( psExtraArg->pProgressData );
     }
+    delete[] rioThreadContext;
 
     psExtraArg->pfnProgress = pfnProgressGlobal;
     psExtraArg->pProgressData = pProgressDataGlobal;

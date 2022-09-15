@@ -1889,21 +1889,20 @@ PNGDataset::CreateCopy( const char * pszFilename, GDALDataset *poSrcDS,
     CPLErr      eErr = CE_None;
     const int nWordSize = GDALGetDataTypeSize(eType) / 8;
 
-    GByte *pabyScanline = reinterpret_cast<GByte *>(
-        CPLMalloc( nBands * nXSize * nWordSize ) );
-
-    for( int iLine = 0; iLine < nYSize && eErr == CE_None; iLine++ )
-    {
-        png_bytep       row = pabyScanline;
-
-        eErr = poSrcDS->RasterIO( GF_Read, 0, iLine, nXSize, 1,
-                                  pabyScanline,
-                                  nXSize, 1, eType,
+    GByte *pabyScanBlock = reinterpret_cast<GByte *>(
+        CPLMalloc( nBands * nXSize * nYSize * nWordSize ) );
+    eErr = poSrcDS->RasterIO( GF_Read, 0, 0, nXSize, nYSize,
+                                  pabyScanBlock,
+                                  nXSize, nYSize, eType,
                                   nBands, nullptr,
                                   nBands * nWordSize,
                                   nBands * nXSize * nWordSize,
                                   nWordSize,
                                   nullptr );
+
+    for( int iLine = 0; iLine < nYSize && eErr == CE_None; iLine++ )
+    {
+        png_bytep       row = pabyScanBlock +  iLine * nBands * nXSize * nWordSize ;
 
 #ifdef CPL_LSB
         if( nBitDepth == 16 )
@@ -1927,7 +1926,7 @@ PNGDataset::CreateCopy( const char * pszFilename, GDALDataset *poSrcDS,
         }
     }
 
-    CPLFree( pabyScanline );
+    CPLFree( pabyScanBlock );
 
     if( !safe_png_write_end( sSetJmpContext, hPNG, psPNGInfo ) )
     {
